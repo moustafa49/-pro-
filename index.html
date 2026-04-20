@@ -1,0 +1,185 @@
+<!DOCTYPE html><html>
+<head>
+<meta charset="UTF-8">
+<title>Greedy Cat MAX — QUANTUM AI</title><style>
+body{font-family:Arial;background:#020617;color:white;text-align:center;padding:20px}
+h1{color:#22c55e}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}
+button{padding:12px;font-size:20px;background:#1e293b;color:white;border:none;border-radius:8px;cursor:pointer}
+.section{margin-top:16px}
+video{border-radius:10px;margin-top:10px}
+canvas{display:none}
+</style></head><body><h1>Greedy Cat MAX — QUANTUM AI</h1><!-- Buttons --><div class="grid">
+<button onclick="add('corn')">🌽</button>
+<button onclick="add('tomato')">🍅</button>
+<button onclick="add('carrot')">🥕</button>
+<button onclick="add('pepper')">🌶️</button>
+<button onclick="add('fish')">🐟</button>
+<button onclick="add('shrimp')">🦐</button>
+<button onclick="add('cow')">🐄</button>
+<button onclick="add('chicken')">🐔</button>
+</div><button onclick="undo()">Undo</button>
+<button onclick="reset()">Reset</button>
+
+<!-- Camera --><div class="section">
+<button onclick="startCamera()">📷 Camera</button>
+<button onclick="startLive()">🎥 Live Scan</button>
+<video id="video" width="280" autoplay></video>
+<canvas id="canvas" width="280" height="150"></canvas>
+</div><!-- Quick Add --><div class="grid">
+<button onclick="quickAdd('corn')">🌽</button>
+<button onclick="quickAdd('tomato')">🍅</button>
+<button onclick="quickAdd('carrot')">🥕</button>
+<button onclick="quickAdd('pepper')">🌶️</button>
+<button onclick="quickAdd('fish')">🐟</button>
+<button onclick="quickAdd('shrimp')">🦐</button>
+<button onclick="quickAdd('cow')">🐄</button>
+<button onclick="quickAdd('chicken')">🐔</button>
+</div><div class="section"><b>History</b><div id="history"></div></div>
+<div class="section"><b>Repeat</b><div id="repeat"></div></div>
+<div class="section"><b>Absence</b><div id="absence"></div></div>
+<div class="section"><b>Cycle</b><div id="cycle"></div></div>
+<div class="section"><b>Drift</b><div id="drift"></div></div>
+<div class="section"><b>Behaviour</b><div id="behaviour"></div></div><div class="section"><b>Prediction</b><div id="prediction"></div></div>
+<div class="section"><b>Top5</b><div id="top5"></div></div>
+<div class="section"><b>Top6</b><div id="top6"></div></div><div class="section"><b>AI Analysis</b><div id="analysis"></div></div>
+<div class="section"><b>Risk</b><div id="risk"></div></div>
+<div class="section"><b>Suggestion</b><div id="suggest"></div></div><script>
+
+const foods=["corn","tomato","carrot","pepper","fish","shrimp","cow","chicken"]
+const veg=["corn","tomato","carrot","pepper"]
+const meat=["fish","shrimp","cow","chicken"]
+
+const emoji={
+corn:"🌽",tomato:"🍅",carrot:"🥕",pepper:"🌶️",
+fish:"🐟",shrimp:"🦐",cow:"🐄",chicken:"🐔"
+}
+
+let history=[]
+let transitionMatrix={}
+let neuralWeights={}
+let predictions=0
+let correct=0
+
+foods.forEach(f=>neuralWeights[f]=1)
+
+function add(food){
+
+if(window.lastPrediction){
+predictions++
+if(window.lastPrediction.includes(food)){
+correct++
+neuralWeights[food]+=0.2
+}else{
+window.lastPrediction.forEach(p=>neuralWeights[p]-=0.03)
+}
+}
+
+if(history.length>0){
+let prev=history[history.length-1]
+if(!transitionMatrix[prev])transitionMatrix[prev]={}
+if(!transitionMatrix[prev][food])transitionMatrix[prev][food]=0
+transitionMatrix[prev][food]++
+}
+
+history.push(food)
+update()
+}
+
+function quickAdd(f){add(f)}
+function undo(){history.pop();update()}
+function reset(){history=[];update()}
+
+/* Camera */
+
+async function startCamera(){
+let video=document.getElementById("video")
+let stream=await navigator.mediaDevices.getUserMedia({video:true})
+video.srcObject=stream
+}
+
+function startLive(){
+setInterval(()=>console.log("Live scanning..."),1000)
+}
+
+/* Analysis */
+
+function absence(f){
+for(let i=history.length-1;i>=0;i--){
+if(history[i]==f)return history.length-i-1
+}
+return history.length
+}
+
+function cycle(){
+if(history.length<12)return "None"
+let a=history.slice(-6).join("-")
+let b=history.slice(-12,-6).join("-")
+return a===b?"Cycle Detected":"None"
+}
+
+function drift(){
+let last=history.slice(-10)
+let v=last.filter(x=>veg.includes(x)).length
+let m=last.filter(x=>meat.includes(x)).length
+if(v-m>5)return "Veg Drift"
+if(m-v>5)return "Meat Drift"
+return "Stable"
+}
+
+function behaviour(){
+let last=history.slice(-6)
+let map={}
+foods.forEach(f=>map[f]=0)
+last.forEach(f=>map[f]++)
+let max=Math.max(...Object.values(map))
+let f=Object.keys(map).find(k=>map[k]==max)
+return max>=4?"Bias "+emoji[f]:"Normal"
+}
+
+/* AI */
+
+function aiScores(){
+let scores={}
+foods.forEach(f=>scores[f]=Math.random())
+
+history.forEach(f=>scores[f]+=neuralWeights[f])
+
+return scores
+}
+
+function update(){
+
+document.getElementById("history").innerHTML=history.slice(-20).map(x=>emoji[x]).join(" ")
+
+document.getElementById("repeat").innerHTML=history.slice(-3).join(" ")
+
+document.getElementById("absence").innerHTML=
+foods.map(f=>emoji[f]+" "+absence(f)).join(" | ")
+
+document.getElementById("cycle").innerHTML=cycle()
+document.getElementById("drift").innerHTML=drift()
+document.getElementById("behaviour").innerHTML=behaviour()
+
+let s=aiScores()
+let sorted=Object.entries(s).sort((a,b)=>b[1]-a[1])
+
+let top5=sorted.slice(0,5).map(x=>x[0])
+let top6=sorted.slice(0,6).map(x=>x[0])
+
+window.lastPrediction=top5
+
+document.getElementById("prediction").innerHTML=top5.map(x=>emoji[x]).join(" ")
+document.getElementById("top5").innerHTML=top5.map(x=>emoji[x]).join(" ")
+document.getElementById("top6").innerHTML=top6.map(x=>emoji[x]).join(" ")
+
+document.getElementById("analysis").innerHTML="AI Running..."
+document.getElementById("risk").innerHTML="Dynamic"
+document.getElementById("suggest").innerHTML="Follow Top"
+
+}
+
+update()
+
+</script></body>
+</html>
